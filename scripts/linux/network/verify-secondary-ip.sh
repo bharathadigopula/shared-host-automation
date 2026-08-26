@@ -29,6 +29,6 @@ ip -4 address show dev "$interface_name" | grep -F "inet ${secondary_private_ip}
 # PERSISTENT CONFIGURATION VERIFICATION
 #==============================================================================
 
-test -f "$netplan_file"
-grep -F -- "- ${secondary_private_ip}/32" "$netplan_file"
+sudo -n test -f "$netplan_file"
+sudo -n grep -F -- "- ${secondary_private_ip}/32" "$netplan_file"
 printf 'secondary_ip=%s\ninterface=%s\npersistence=ready\n' "$secondary_private_ip" "$interface_name"
