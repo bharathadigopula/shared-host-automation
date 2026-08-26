@@ -76,4 +76,5 @@ fi
 rm -f "$backup_file"
 netplan apply
 ip -4 address show dev "$interface_name" | grep -F "inet ${secondary_private_ip}/32"
+printf 'secondary_ip=%s\ninterface=%s\nconfiguration=ready\n' "$secondary_private_ip" "$interface_name"
 ROOT_SCRIPT
