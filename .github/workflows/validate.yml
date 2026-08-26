@@ -1,0 +1,39 @@
+#==============================================================================
+# SHARED HOST AUTOMATION VALIDATION
+#==============================================================================
+
+name: Validate host automation
+
+#==============================================================================
+# WORKFLOW TRIGGERS
+#==============================================================================
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+#==============================================================================
+# WORKFLOW PERMISSIONS AND CONCURRENCY
+#==============================================================================
+
+permissions:
+  contents: read
+
+concurrency:
+  group: host-automation-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+#==============================================================================
+# HOST AUTOMATION VALIDATION
+#==============================================================================
+
+jobs:
+  validate:
+    uses: bharathadigopula/github-pipeline-templates/.github/workflows/shell-validate.yml@v0.7.0
+    with:
+      search_path: scripts
+    permissions:
+      contents: read
