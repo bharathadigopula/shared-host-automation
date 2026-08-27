@@ -35,7 +35,7 @@ if [[ ! "$tunnel_token" =~ ^[A-Za-z0-9._=-]{100,}$ ]]; then
   exit 10
 fi
 
-for required_command in curl dpkg install sha256sum sudo systemctl; do
+for required_command in curl dpkg install iptables sha256sum sudo systemctl; do
   if ! command -v "$required_command" >/dev/null 2>&1; then
     printf 'Required command is unavailable: %s\n' "$required_command" >&2
     exit 20
@@ -48,15 +48,48 @@ if ! sudo -n true; then
 fi
 
 #==============================================================================
-# PRIVATE METRICS FIREWALL
+# PRIVATE METRICS FIREWALL FILES
 #==============================================================================
 
-if command -v ufw >/dev/null 2>&1 && sudo -n ufw status | grep -Fq 'Status: active'; then
-  sudo -n ufw allow proto tcp from "$metrics_source_address" to "$metrics_address" port 8880 comment 'cloudflared metrics'
-  printf 'cloudflared_firewall=managed\n'
-else
-  printf 'cloudflared_firewall=inactive\n'
-fi
+firewall_script=$(mktemp)
+firewall_unit=$(mktemp)
+trap 'rm -f "$firewall_script" "$firewall_unit"' EXIT
+
+cat > "$firewall_script" <<FIREWALL
+#!/usr/bin/env bash
+
+#==============================================================================
+# CLOUDFLARED METRICS FIREWALL
+#==============================================================================
+
+set -euo pipefail
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
+iptables -N CLOUDFLARED_METRICS 2>/dev/null || true
+iptables -F CLOUDFLARED_METRICS
+iptables -A CLOUDFLARED_METRICS -p tcp -s ${metrics_source_address}/32 -d ${metrics_address}/32 --dport 8880 -j ACCEPT
+iptables -C INPUT -j CLOUDFLARED_METRICS 2>/dev/null || iptables -I INPUT 1 -j CLOUDFLARED_METRICS
+FIREWALL
+
+cat > "$firewall_unit" <<UNIT
+[Unit]
+Description=Cloudflared metrics firewall
+After=network-online.target
+Before=cloudflared.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/cloudflared-metrics-firewall
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+chmod 755 "$firewall_script"
+sudo -n install -o root -g root -m 755 "$firewall_script" /usr/local/sbin/cloudflared-metrics-firewall
+sudo -n install -o root -g root -m 644 "$firewall_unit" /etc/systemd/system/cloudflared-metrics-firewall.service
 
 #==============================================================================
 # PINNED PACKAGE INSTALLATION
@@ -101,7 +134,7 @@ fi
 
 token_file=$(mktemp)
 unit_file=$(mktemp)
-trap 'rm -f "$token_file" "$unit_file"' EXIT
+trap 'rm -f "$firewall_script" "$firewall_unit" "$token_file" "$unit_file"' EXIT
 
 printf '%s\n' "$tunnel_token" > "$token_file"
 chmod 600 "$token_file"
@@ -109,7 +142,8 @@ chmod 600 "$token_file"
 cat > "$unit_file" <<UNIT
 [Unit]
 Description=Cloudflare Tunnel
-After=network-online.target
+After=network-online.target cloudflared-metrics-firewall.service
+Requires=cloudflared-metrics-firewall.service
 Wants=network-online.target
 
 [Service]
@@ -127,6 +161,7 @@ sudo -n install -o root -g root -m 600 "$token_file" /etc/cloudflared/tunnel.tok
 sudo -n install -o root -g root -m 644 "$unit_file" /etc/systemd/system/cloudflared.service
 sudo -n rm -f /etc/cloudflared/tunnel.env
 sudo -n systemctl daemon-reload
+sudo -n systemctl enable --now cloudflared-metrics-firewall.service
 sudo -n systemctl enable cloudflared.service
 sudo -n systemctl restart cloudflared.service
 
@@ -147,6 +182,8 @@ for attempt in {1..30}; do
 done
 
 curl --fail --silent --show-error "http://${metrics_address}:8880/metrics" >/dev/null
+sudo -n iptables -C CLOUDFLARED_METRICS -p tcp -s "${metrics_source_address}/32" -d "${metrics_address}/32" --dport 8880 -j ACCEPT
+printf 'cloudflared_firewall=managed\n'
 
 #==============================================================================
 # PRIVATE METRICS NETWORK STATUS
