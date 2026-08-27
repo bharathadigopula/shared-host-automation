@@ -147,6 +147,25 @@ for attempt in {1..30}; do
 done
 
 curl --fail --silent --show-error "http://${metrics_address}:8880/metrics" >/dev/null
+
+#==============================================================================
+# PRIVATE METRICS NETWORK STATUS
+#==============================================================================
+
+printf 'cloudflared_interface=%s\n' "$(ip -o -4 address show | awk -v address="$metrics_address" '$4 == address "/32" { print $2 ":" $4 }')"
+printf 'cloudflared_listener=%s\n' "$(ss -H -lnt "sport = :8880" | awk 'NR == 1 { print $4 }')"
+printf 'cloudflared_return_route=%s\n' "$(ip -4 route get "$metrics_source_address" | head -n 1)"
+if command -v iptables >/dev/null 2>&1; then
+  printf 'cloudflared_iptables_policy=%s\n' "$(sudo -n iptables -S INPUT | head -n 1)"
+  printf 'cloudflared_iptables_rejects=%s\n' "$(sudo -n iptables -S INPUT | grep -Ec -- '-j (DROP|REJECT)' || true)"
+else
+  printf 'cloudflared_iptables_policy=unavailable\ncloudflared_iptables_rejects=unavailable\n'
+fi
+if command -v nft >/dev/null 2>&1; then
+  printf 'cloudflared_nft_rejects=%s\n' "$(sudo -n nft list ruleset 2>/dev/null | grep -Ec '(^|[[:space:]])(drop|reject)([[:space:]]|$)' || true)"
+else
+  printf 'cloudflared_nft_rejects=unavailable\n'
+fi
 printf 'cloudflared_version=%s\n' "$installed_version"
 printf 'cloudflared_metrics=ready\n'
 printf 'cloudflare_tunnel=ready\n'

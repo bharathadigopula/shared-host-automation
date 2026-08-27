@@ -33,12 +33,12 @@ CLOUDFLARE TUNNEL CONNECTOR
 
 ## Cloudflare Tunnel Connector
 
-Release `v0.3.2` uses the compact bootstrap as the OCI Run Command entry point. It accepts the immutable repository, release, private metrics address, monitoring source address, and Vault-injected Cloudflare Tunnel token in that order.
+Release `v0.3.3` uses the compact bootstrap as the OCI Run Command entry point. It accepts the immutable repository, release, private metrics address, monitoring source address, and Vault-injected Cloudflare Tunnel token in that order.
 
 ```shell
 bash scripts/linux/cloudflare/bootstrap-cloudflared.sh \
 	bharathadigopula/shared-host-automation \
-	v0.3.2 \
+	v0.3.3 \
 	10.10.10.125 \
 	10.10.10.3 \
 	"$TUNNEL_TOKEN"
