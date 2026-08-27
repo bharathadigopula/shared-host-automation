@@ -35,9 +35,9 @@ done
 
 sample_arguments=$(jq -cn '[
   "bharathadigopula/shared-host-automation",
-  "v0.3.3",
+  "v0.3.4",
   "10.10.10.125",
-  "10.10.10.3",
+  "10.10.10.34",
   ("A" * 255)
 ]')
 argument_line=$(jq -r '[.[] | @sh] | "set -- " + join(" ")' <<< "$sample_arguments")
@@ -61,7 +61,8 @@ fi
 # PRIVATE METRICS FIREWALL VALIDATION
 #==============================================================================
 
-if ! grep -Fq "ufw allow proto tcp from \"\$metrics_source_address\" to \"\$metrics_address\" port 8880" "$installer_script"; then
+if ! grep -Fq 'iptables -A CLOUDFLARED_METRICS' "$installer_script" || \
+  ! grep -Fq 'cloudflared-metrics-firewall.service' "$installer_script"; then
   printf 'Cloudflared metrics must use a source-restricted firewall rule.\n' >&2
   exit 1
 fi

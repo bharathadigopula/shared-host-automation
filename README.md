@@ -33,14 +33,14 @@ CLOUDFLARE TUNNEL CONNECTOR
 
 ## Cloudflare Tunnel Connector
 
-Release `v0.3.3` uses the compact bootstrap as the OCI Run Command entry point. It accepts the immutable repository, release, private metrics address, monitoring source address, and Vault-injected Cloudflare Tunnel token in that order.
+Release `v0.3.4` uses the compact bootstrap as the OCI Run Command entry point. It accepts the immutable repository, release, private metrics address, monitoring source address, and Vault-injected Cloudflare Tunnel token in that order.
 
 ```shell
 bash scripts/linux/cloudflare/bootstrap-cloudflared.sh \
 	bharathadigopula/shared-host-automation \
-	v0.3.3 \
+	v0.3.4 \
 	10.10.10.125 \
-	10.10.10.3 \
+	10.10.10.34 \
 	"$TUNNEL_TOKEN"
 ```
 
@@ -76,7 +76,7 @@ The script:
 3. Writes the token to root-owned `/etc/cloudflared/tunnel.token` with mode `0600`.
 4. Starts cloudflared with `--token-file` so the credential is not present in process arguments.
 5. Exposes connector metrics only on `<private-address>:8880`.
-6. When UFW is active, allows only the configured monitoring source address to reach TCP port `8880`.
+6. Installs a systemd-managed iptables chain that allows only the configured monitoring source address to reach TCP port `8880`.
 7. Installs `/etc/systemd/system/cloudflared.service` with automatic restart enabled.
 8. Enables and restarts the service, then confirms both service stability and metrics availability.
 
