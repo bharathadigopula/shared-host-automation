@@ -7,20 +7,27 @@
 set -euo pipefail
 
 metrics_address="${1:-}"
-tunnel_token="${2:-}"
+metrics_source_address="${2:-}"
+tunnel_token="${3:-}"
 cloudflared_version="2026.8.2"
 
-if [[ ! "$metrics_address" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
-  printf 'A valid private metrics IPv4 address is required.\n' >&2
-  exit 10
-fi
+#==============================================================================
+# METRICS NETWORK VALIDATION
+#==============================================================================
 
-IFS=. read -r first_octet second_octet third_octet fourth_octet <<< "$metrics_address"
-for octet in "$first_octet" "$second_octet" "$third_octet" "$fourth_octet"; do
-  if (( 10#$octet > 255 )); then
-    printf 'Invalid metrics IPv4 address: %s\n' "$metrics_address" >&2
+for address in "$metrics_address" "$metrics_source_address"; do
+  if [[ ! "$address" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+    printf 'A valid private metrics IPv4 address is required.\n' >&2
     exit 10
   fi
+
+  IFS=. read -r first_octet second_octet third_octet fourth_octet <<< "$address"
+  for octet in "$first_octet" "$second_octet" "$third_octet" "$fourth_octet"; do
+    if (( 10#$octet > 255 )); then
+      printf 'Invalid metrics IPv4 address: %s\n' "$address" >&2
+      exit 10
+    fi
+  done
 done
 
 if [[ ! "$tunnel_token" =~ ^[A-Za-z0-9._=-]{100,}$ ]]; then
@@ -38,6 +45,17 @@ done
 if ! sudo -n true; then
   printf 'The automation user does not have non-interactive sudo access.\n' >&2
   exit 30
+fi
+
+#==============================================================================
+# PRIVATE METRICS FIREWALL
+#==============================================================================
+
+if command -v ufw >/dev/null 2>&1 && sudo -n ufw status | grep -Fq 'Status: active'; then
+  sudo -n ufw allow proto tcp from "$metrics_source_address" to "$metrics_address" port 8880 comment 'cloudflared metrics'
+  printf 'cloudflared_firewall=managed\n'
+else
+  printf 'cloudflared_firewall=inactive\n'
 fi
 
 #==============================================================================

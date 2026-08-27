@@ -33,17 +33,18 @@ CLOUDFLARE TUNNEL CONNECTOR
 
 ## Cloudflare Tunnel Connector
 
-Release `v0.3.1` uses the compact bootstrap as the OCI Run Command entry point. It accepts the immutable repository, release, private metrics address, and Vault-injected Cloudflare Tunnel token in that order.
+Release `v0.3.2` uses the compact bootstrap as the OCI Run Command entry point. It accepts the immutable repository, release, private metrics address, monitoring source address, and Vault-injected Cloudflare Tunnel token in that order.
 
 ```shell
 bash scripts/linux/cloudflare/bootstrap-cloudflared.sh \
 	bharathadigopula/shared-host-automation \
-	v0.3.1 \
+	v0.3.2 \
+	10.10.10.125 \
 	10.10.10.3 \
 	"$TUNNEL_TOKEN"
 ```
 
-The production workflow does not place the token in repository configuration. It retrieves the current token from OCI Vault, masks it in GitHub Actions, and appends it as a shell-quoted Run Command argument. The bootstrap downloads the matching tagged source and invokes `install-cloudflared.sh` with the metrics address and token.
+The production workflow does not place the token in repository configuration. It retrieves the current token from OCI Vault, masks it in GitHub Actions, and appends it as a shell-quoted Run Command argument. The bootstrap downloads the matching tagged source and invokes `install-cloudflared.sh` with the metrics address, monitoring source address, and token.
 
 <!--
 ==============================================================================
@@ -75,8 +76,9 @@ The script:
 3. Writes the token to root-owned `/etc/cloudflared/tunnel.token` with mode `0600`.
 4. Starts cloudflared with `--token-file` so the credential is not present in process arguments.
 5. Exposes connector metrics only on `<private-address>:8880`.
-6. Installs `/etc/systemd/system/cloudflared.service` with automatic restart enabled.
-7. Enables and restarts the service, then confirms both service stability and metrics availability.
+6. When UFW is active, allows only the configured monitoring source address to reach TCP port `8880`.
+7. Installs `/etc/systemd/system/cloudflared.service` with automatic restart enabled.
+8. Enables and restarts the service, then confirms both service stability and metrics availability.
 
 Successful output includes:
 
@@ -101,7 +103,7 @@ SEARCH_PATH=scripts bash ../github-pipeline-templates/scripts/validation/validat
 bash scripts/validate.sh
 ```
 
-The rendered bootstrap and all four arguments must remain within OCI Run Command's 4,096-byte inline command limit. The repository validator uses the maximum supported 255-character secret and also asserts that cloudflared uses only its root-owned token file.
+The rendered bootstrap and all five arguments must remain within OCI Run Command's 4,096-byte inline command limit. The repository validator uses the maximum supported 255-character secret and also asserts that cloudflared uses only its root-owned token file and a source-restricted UFW rule.
 
 <!--
 ==============================================================================

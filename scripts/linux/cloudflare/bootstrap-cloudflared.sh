@@ -17,7 +17,8 @@ set -euo pipefail
 automation_repository="${1:-}"
 automation_ref="${2:-}"
 metrics_address="${3:-}"
-tunnel_token="${4:-}"
+metrics_source_address="${4:-}"
+tunnel_token="${5:-}"
 
 if [[ ! "$automation_repository" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || \
   [[ ! "$automation_ref" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -43,4 +44,4 @@ tar --extract --gzip --file "$temporary_root/source.tar.gz" \
 #==============================================================================
 
 bash "$temporary_root/source/scripts/linux/cloudflare/install-cloudflared.sh" \
-  "$metrics_address" "$tunnel_token"
+  "$metrics_address" "$metrics_source_address" "$tunnel_token"

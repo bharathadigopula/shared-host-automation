@@ -35,8 +35,9 @@ done
 
 sample_arguments=$(jq -cn '[
   "bharathadigopula/shared-host-automation",
-  "v0.3.1",
+  "v0.3.2",
   "10.10.10.125",
+  "10.10.10.3",
   ("A" * 255)
 ]')
 argument_line=$(jq -r '[.[] | @sh] | "set -- " + join(" ")' <<< "$sample_arguments")
@@ -53,6 +54,15 @@ fi
 if ! grep -Fq -- '--token-file /etc/cloudflared/tunnel.token' "$installer_script" || \
   grep -Fq -- "--token \${TUNNEL_TOKEN}" "$installer_script"; then
   printf 'Cloudflared must use its root-only token file.\n' >&2
+  exit 1
+fi
+
+#==============================================================================
+# PRIVATE METRICS FIREWALL VALIDATION
+#==============================================================================
+
+if ! grep -Fq "ufw allow proto tcp from \"\$metrics_source_address\" to \"\$metrics_address\" port 8880" "$installer_script"; then
+  printf 'Cloudflared metrics must use a source-restricted firewall rule.\n' >&2
   exit 1
 fi
 
