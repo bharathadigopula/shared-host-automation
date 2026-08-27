@@ -35,7 +35,7 @@ done
 
 sample_arguments=$(jq -cn '[
   "bharathadigopula/shared-host-automation",
-  "v0.3.2",
+  "v0.3.3",
   "10.10.10.125",
   "10.10.10.3",
   ("A" * 255)
