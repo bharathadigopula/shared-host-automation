@@ -37,3 +37,15 @@ jobs:
       search_path: scripts
     permissions:
       contents: read
+
+  validate-cloudflared-bootstrap:
+    name: Validate cloudflared bootstrap
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Validate OCI payload and secret handling
+        run: bash scripts/validate.sh
