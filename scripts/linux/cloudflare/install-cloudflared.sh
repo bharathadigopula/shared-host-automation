@@ -6,8 +6,22 @@
 
 set -euo pipefail
 
-tunnel_token="${1:-}"
+metrics_address="${1:-}"
+tunnel_token="${2:-}"
 cloudflared_version="2026.8.2"
+
+if [[ ! "$metrics_address" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+  printf 'A valid private metrics IPv4 address is required.\n' >&2
+  exit 10
+fi
+
+IFS=. read -r first_octet second_octet third_octet fourth_octet <<< "$metrics_address"
+for octet in "$first_octet" "$second_octet" "$third_octet" "$fourth_octet"; do
+  if (( 10#$octet > 255 )); then
+    printf 'Invalid metrics IPv4 address: %s\n' "$metrics_address" >&2
+    exit 10
+  fi
+done
 
 if [[ ! "$tunnel_token" =~ ^[A-Za-z0-9._=-]{100,}$ ]]; then
   printf 'A valid Cloudflare tunnel token is required.\n' >&2
@@ -71,10 +85,10 @@ token_file=$(mktemp)
 unit_file=$(mktemp)
 trap 'rm -f "$token_file" "$unit_file"' EXIT
 
-printf 'TUNNEL_TOKEN=%s\n' "$tunnel_token" > "$token_file"
+printf '%s\n' "$tunnel_token" > "$token_file"
 chmod 600 "$token_file"
 
-cat > "$unit_file" <<'UNIT'
+cat > "$unit_file" <<UNIT
 [Unit]
 Description=Cloudflare Tunnel
 After=network-online.target
@@ -82,8 +96,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-EnvironmentFile=/etc/cloudflared/tunnel.env
-ExecStart=/usr/bin/cloudflared --no-autoupdate tunnel run --token ${TUNNEL_TOKEN}
+ExecStart=/usr/bin/cloudflared --no-autoupdate tunnel --metrics ${metrics_address}:8880 run --token-file /etc/cloudflared/tunnel.token
 Restart=always
 RestartSec=5s
 
@@ -92,8 +105,9 @@ WantedBy=multi-user.target
 UNIT
 
 sudo -n install -d -o root -g root -m 700 /etc/cloudflared
-sudo -n install -o root -g root -m 600 "$token_file" /etc/cloudflared/tunnel.env
+sudo -n install -o root -g root -m 600 "$token_file" /etc/cloudflared/tunnel.token
 sudo -n install -o root -g root -m 644 "$unit_file" /etc/systemd/system/cloudflared.service
+sudo -n rm -f /etc/cloudflared/tunnel.env
 sudo -n systemctl daemon-reload
 sudo -n systemctl enable cloudflared.service
 sudo -n systemctl restart cloudflared.service
@@ -114,5 +128,7 @@ for attempt in {1..30}; do
   sleep 2
 done
 
+curl --fail --silent --show-error "http://${metrics_address}:8880/metrics" >/dev/null
 printf 'cloudflared_version=%s\n' "$installed_version"
+printf 'cloudflared_metrics=ready\n'
 printf 'cloudflare_tunnel=ready\n'

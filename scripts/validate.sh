@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+
+#==============================================================================
+# SHARED HOST AUTOMATION VALIDATION
+#==============================================================================
+
+#==============================================================================
+# SHELL SAFETY
+#==============================================================================
+
+set -euo pipefail
+
+#==============================================================================
+# REPOSITORY PATHS
+#==============================================================================
+
+repository_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+bootstrap_script="$repository_root/scripts/linux/cloudflare/bootstrap-cloudflared.sh"
+installer_script="$repository_root/scripts/linux/cloudflare/install-cloudflared.sh"
+
+#==============================================================================
+# REQUIRED FILES
+#==============================================================================
+
+for required_file in "$bootstrap_script" "$installer_script"; do
+  if [[ ! -f "$required_file" ]]; then
+    printf 'Missing required file: %s\n' "$required_file" >&2
+    exit 1
+  fi
+done
+
+#==============================================================================
+# OCI BOOTSTRAP PAYLOAD VALIDATION
+#==============================================================================
+
+sample_arguments=$(jq -cn '[
+  "bharathadigopula/shared-host-automation",
+  "v0.3.1",
+  "10.10.10.125",
+  ("A" * 255)
+]')
+argument_line=$(jq -r '[.[] | @sh] | "set -- " + join(" ")' <<< "$sample_arguments")
+rendered_size=$(printf '%s\n%s' "$argument_line" "$(cat "$bootstrap_script")" | wc -c | tr -d ' ')
+if (( rendered_size > 4096 )); then
+  printf 'Rendered cloudflared bootstrap exceeds the OCI 4096-byte inline limit.\n' >&2
+  exit 1
+fi
+
+#==============================================================================
+# CLOUDFLARED SECRET HANDLING VALIDATION
+#==============================================================================
+
+if ! grep -Fq -- '--token-file /etc/cloudflared/tunnel.token' "$installer_script" || \
+  grep -Fq -- "--token \${TUNNEL_TOKEN}" "$installer_script"; then
+  printf 'Cloudflared must use its root-only token file.\n' >&2
+  exit 1
+fi
+
+#==============================================================================
+# VALIDATION RESULT
+#==============================================================================
+
+printf 'host_automation_validation=ready\n'
