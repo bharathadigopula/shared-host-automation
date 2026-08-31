@@ -98,6 +98,8 @@ REPOSITORY VALIDATION
 
 ## Validation
 
+Jenkins reads `.jenkins/pipelines/validate.groovy` with `jenkins-pipeline-templates v1.3.0`. Validation runs on the `platform` agent with ANSI console output and does not mutate hosts.
+
 ```shell
 SEARCH_PATH=scripts bash ../github-pipeline-templates/scripts/validation/validate-shell.sh
 bash scripts/validate.sh
