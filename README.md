@@ -98,7 +98,7 @@ REPOSITORY VALIDATION
 
 ## Validation
 
-Jenkins reads `.jenkins/pipelines/validate.groovy` with `jenkins-pipeline-templates v1.3.0`. Validation runs on the `platform` agent with ANSI console output and does not mutate hosts.
+Jenkins reads `.jenkins/pipelines/validate.groovy` with `jenkins-pipeline-templates v1.4.0`, publishes the required `continuous-integration/jenkins` check, and validates on the `platform` agent with ANSI console output without mutating hosts. The retained GitHub Actions validation workflow runs on pull requests, `main`, or manual dispatch.
 
 ```shell
 SEARCH_PATH=scripts bash ../github-pipeline-templates/scripts/validation/validate-shell.sh
